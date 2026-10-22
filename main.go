@@ -4,22 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
-
-type Config struct {
-	GatewayPort string    `yaml:"gatewayPort"`
-	Services    []Service `yaml:"services"`
-}
-type Service struct {
-	Name       string `yaml:"name"`
-	Path       string `yaml:"path"`
-	BackendURL string `yaml:"backendURL"`
-}
 
 func main() {
 	fmt.Println("Go Gate !")
@@ -37,16 +25,17 @@ func main() {
 	serverMux := http.NewServeMux()
 
 	for _, svc := range config.Services {
-		backendUrl, err := url.Parse(svc.BackendURL)
-		if err != nil {
-			log.Fatalf("Invalid URL %s: %v", svc.Name, err)
+		pool := NewServerPool()
+
+		for i, backendURL := range svc.Backends {
+			serviceID := fmt.Sprintf("%s-%d", svc.Name, i+1)
+			if err := pool.AddBackend(serviceID, backendURL); err != nil {
+				log.Fatalf("Invalid backend URL %s: %v", backendURL, err)
+			}
 		}
 
-		proxy := httputil.NewSingleHostReverseProxy(backendUrl)
-
-		serverMux.Handle(svc.Path, proxy)
-
-		log.Printf("Register route successful %s -> %s", svc.Path, svc.BackendURL)
+		serverMux.Handle(svc.Path, newServiceHandler(pool))
+		log.Printf("Register route successful %s (%d backends)", svc.Path, len(svc.Backends))
 	}
 
 	log.Printf("GoGate listening on :%s", config.GatewayPort)

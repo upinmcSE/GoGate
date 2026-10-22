@@ -7,6 +7,9 @@ import (
 	"net/http"
 )
 
+// go run test/backend.go -port 8081
+// go run test/backend.go -port 8081
+
 func main() {
 	port := flag.Int("port", 8081, "Port to listen on")
 	flag.Parse()
