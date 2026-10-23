@@ -16,9 +16,9 @@ type Config struct {
 }
 
 type Service struct {
-	Name     string   `yaml:"name"`
-	Path     string   `yaml:"path"`
-	Backends []string `yaml:"backends"`
+	Name              string `yaml:"name"`
+	Path              string `yaml:"path"`
+	ConsulServiceName string `yaml:"consulServiceName"`
 }
 
 type Backend struct {

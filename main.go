@@ -1,16 +1,23 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/hashicorp/consul/api"
 	"gopkg.in/yaml.v3"
 )
 
 func main() {
 	fmt.Println("Go Gate !")
+
+	consulClient, err := api.NewClient(api.DefaultConfig())
+	if err != nil {
+		log.Fatalf("Failed to create Consul client: %v", err)
+	}
 
 	data, err := os.ReadFile("config/config.yaml")
 	if err != nil {
@@ -23,19 +30,19 @@ func main() {
 	}
 
 	serverMux := http.NewServeMux()
+	ctx := context.Background()
 
 	for _, svc := range config.Services {
-		pool := NewServerPool()
-
-		for i, backendURL := range svc.Backends {
-			serviceID := fmt.Sprintf("%s-%d", svc.Name, i+1)
-			if err := pool.AddBackend(serviceID, backendURL); err != nil {
-				log.Fatalf("Invalid backend URL %s: %v", backendURL, err)
-			}
+		if svc.ConsulServiceName == "" {
+			log.Printf("Skipping service %s: missing consulServiceName", svc.Name)
+			continue
 		}
 
+		pool := NewServerPool()
+		pool.startConsulWatcher(ctx, consulClient, svc.ConsulServiceName)
+
 		serverMux.Handle(svc.Path, newServiceHandler(pool))
-		log.Printf("Register route successful %s (%d backends)", svc.Path, len(svc.Backends))
+		log.Printf("Registered route: %s -> Consul Service: '%s'", svc.Path, svc.ConsulServiceName)
 	}
 
 	log.Printf("GoGate listening on :%s", config.GatewayPort)
